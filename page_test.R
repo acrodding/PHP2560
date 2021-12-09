@@ -1,67 +1,59 @@
-df<-read.csv("C:/Users/zheji/OneDrive/brown/PHP 2560 Programming with R/Final project/tennis_atp-master/tennis_atp-master/atp_matches_2014.csv")
 library(tidyverse)
-library(igraph)
+library(igraph) # for graph_from_data_frame and get.adjacency
+library(Gmisc) # for pathJoin function
 
-adjacencyMatrix<-function(df, sur = "all"){
-  # sur is a defult for surface 
-  pl.id1 <- df%>% distinct(winner_id) %>% rename(id = winner_id)
-  pl.id2 <- df%>% distinct(loser_id) %>% rename(id = loser_id)
-  pl.id <- full_join(pl.id1,pl.id2)
+source("C:/Users/zheji/OneDrive/brown/PHP 2560 Programming with R/Final project/code/readdata.R", echo=TRUE)
 
-  n <- as.numeric(count(pl.id))
+df <- yeardf(2001,2010,type = "ATP",sur = "all")
+
+adjacencyMatrix<-function(df){
+  # given dataframe of tennis, return adjacencyMatrix
+  
+  pl.name <- unique(c(df$winner_name, df$loser_name))
+  
+  n <- n_distinct(pl.name)
   weight <- matrix(0, nrow = n,ncol = n)
-  pl.id <-as.matrix(pl.id)
+  pl.name <-as.matrix(pl.name)
   weight <-as.data.frame(weight)
-  rownames(weight) <- pl.id
-  colnames(weight) <- pl.id
-  if(sur == "all"){
-    plays <- df %>% select(loser_id,winner_id) 
-  }else{
-    plays <- df %>% group_by(loser_id,winner_id, surface)%>% filter(surface == sur) %>% select(-surface)
-  }
+  rownames(weight) <- pl.name
+  colnames(weight) <- pl.name
+ 
+  plays <- df %>% select(loser_name,winner_name) 
   
-  G <- graph_from_data_frame( d= plays, vertices = pl.id, directed = T )
-  V(G)$name <- as.character(pl.id)
-  adjM <- get.adjacency(G)
-  
-  return(as.matrix(adjM))
-
+  G <- graph_from_data_frame( d= plays, vertices = pl.name, directed = T )
+  adjM <- get.adjacency(G,sparse = FALSE) # sparse = false is needed ,otherwise return sparse matrix
+  #adjM's row is j, col is i
+  # return transposed , then row is i, col is j
+  return(t(adjM))
 }
 
 adjM <- adjacencyMatrix(df)
 
-dProbabilityMatrix<-function(G,d=0.85){
-  # 1 step trans probability matrix, d is 1-q is paper
-  cs <- colSums(G)
+
+itera_fun <- function(M, d = 0.85, iter = 100){
+  # M is adjacencymatrix, d is (1-q) is paper, iter is iteration times
+  # return a list with preScore and all results in iteration (pre.matrix)
+  n <- nrow(M)
+  cs <- colSums(M)
   cs[cs==0] <- 1
-  n <- nrow(G)
-  delta <- (1-d)/n
-  A <- matrix(delta,nrow(G),ncol(G))
-  rownames(A) <- rownames(G)
-  colnames(A) <- colnames(G)
-  for (i in 1:n) A[i,] <- A[i,] + d*G[i,]/cs
-  A
+
+  r <- rep(1/n,n) # iteration start
+  pr <- matrix(0,nrow = n, ncol = iter) # pre.matrix, save all iteration results in each column,
+  pr[,1] <- r  
+  A <- matrix(1/cs,n,n,byrow = TRUE) # A_ij is 1/L(Pj), w_ji/s_jout in paper
+  signM <- M/ifelse(M == 0, 1, M) # signal matrix of M, is j links to i , signM_ij is 1, otherwise 0
+  A <- A * M # if j links to i, A_ij is 1/L(Pj), otherwise 0. this is original Pagerank, a litter different from paper, but the results is same. 
+  
+  for( j in 2:iter){
+  
+    pr[,j] <- (1-d)/n + d*A %*% pr[,j-1] # matrix form of equation (1) in paper
+    
+  }
+  
+  pre <- data.frame("preScore" = pr[,iter], "players.name" = rownames(M))
+  results <- list("preScore" =pre, "pre.matrix" = pr,"iteration.times" = iter)
 }
 
-W <- dProbabilityMatrix(adjM)
 
-calcEigenMatrix<-function(W){
-  x <- Re(eigen(W)$vectors[,1])
-  ei<-x/sum(x)
-  ei<-as.data.frame(ei)
-  ei$players.id <- rownames(W)
-  return(ei)
-}
+pre <- itera_fun(adjM)
 
-
-prescore <- calcEigenMatrix(W) %>% arrange(desc(ei)) %>% rename("preScroe" = ei)
-
-winner <- df %>% select(winner_id,winner_name) %>% rename("players.id" = winner_id, 
-                                                          "players.name" = winner_name)
-loser <- df %>% select(loser_id, loser_name) %>% rename("players.id" = loser_id, 
-                                                        "players.name" = loser_name)
-players <- unique(rbind(winner,loser)) 
-players$players.id <-as.character(players$players.id)
-
-
-PresRusults <- left_join(prescore,players, by = "players.id" )
