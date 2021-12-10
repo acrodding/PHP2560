@@ -9,7 +9,7 @@ df <- yeardf(2001,2010,type = "ATP",sur = "all")
 adjacencyMatrix<-function(df){
   # given dataframe of tennis, return adjacencyMatrix
   
-  pl.name <- unique(c(df$winner_name, df$loser_name))
+  pl.name <- unique(c(as.vector(df$winner_name), as.vector(df$loser_name)))
   
   n <- n_distinct(pl.name)
   weight <- matrix(0, nrow = n,ncol = n)
