@@ -2,6 +2,8 @@ library(tidyverse)
 library(cowplot)
 library(Gmisc)
 library(plotly)
+library(ggpubr)
+library(igraph)
 
 yeardf <-function(year.st,year.end, type = "ATP",sur = "all"){
     # given year range, and tournaments type in c("ATP","WTA"), and surface type
@@ -54,44 +56,127 @@ figure1 <- function(df){
     numbers$year<-as.character(numbers$year)
     
     players<- ggplotly(ggplot(dat=numbers) +
-        geom_col(aes(x=year, y=n_players)))
+        geom_col(aes(x=year, y=n_players)) )
     
     tournaments<- ggplotly(ggplot(dat=numbers) +
-        geom_col(aes(x=year, y=n_tournaments)))
+        geom_col(aes(x=year, y=n_tournaments)) ) 
     
-    subplot(players, tournaments, nrows=2)
-    
+    subplot(players, tournaments, nrows=2, margin=0.1) %>%
+        layout(showlegend = FALSE,
+               annotations = list(
+                   list(x = 0.5 , y = 1.08, text = "Number of Players in Each Year", showarrow = F, xref='paper', yref='paper'),
+                   list(x = 0.5 , y = 0.45, text = "Number of Tournaments in Each Year", showarrow = F, xref='paper', yref='paper')))
+
 }
+
+# prestige score
+adjacencyMatrix<-function(df){
+    # given dataframe of tennis, return adjacencyMatrix
+    
+    pl.name <- unique(c(as.vector(df$winner_name), as.vector(df$loser_name)))
+    
+    n <- n_distinct(pl.name)
+    weight <- matrix(0, nrow = n,ncol = n)
+    pl.name <-as.matrix(pl.name)
+    weight <-as.data.frame(weight)
+    rownames(weight) <- pl.name
+    colnames(weight) <- pl.name
+    
+    plays <- df %>% select(loser_name,winner_name) 
+    
+    G <- graph_from_data_frame( d= plays, vertices = pl.name, directed = T )
+    adjM <- get.adjacency(G,sparse = FALSE) # sparse = false is needed ,otherwise return sparse matrix
+    #adjM's row is j, col is i
+    # return transposed , then row is i, col is j
+    return(t(adjM))
+}
+
+
+itera_fun <- function(M, d = 0.85, iter = 100){
+    # M is adjacencymatrix, d is (1-q) is paper, iter is iteration times
+    # return a list with preScore and all results in iteration (pre.matrix)
+    n <- nrow(M)
+    cs <- colSums(M)
+    cs[cs==0] <- 1
+    
+    r <- rep(1/n,n) # iteration start
+    pr <- matrix(0,nrow = n, ncol = iter) # pre.matrix, save all iteration results in each column,
+    pr[,1] <- r  
+    A <- matrix(1/cs,n,n,byrow = TRUE) # A_ij is 1/L(Pj), w_ji/s_jout in paper
+    signM <- M/ifelse(M == 0, 1, M) # signal matrix of M, is j links to i , signM_ij is 1, otherwise 0
+    A <- A * M # if j links to i, A_ij is 1/L(Pj), otherwise 0. this is original Pagerank, a litter different from paper, but the results is same. 
+    
+    for( j in 2:iter){
+        
+        pr[,j] <- (1-d)/n + d*A %*% pr[,j-1] # matrix form of equation (1) in paper
+        
+    }
+    
+    pre <- data.frame("preScore" = pr[,iter], "players.name" = rownames(M))
+    results <- list("preScore" =pre, "pre.matrix" = pr,"iteration.times" = iter)
+}
+
 
 
 ui <- fluidPage(
     titlePanel("PHP2560 Final Project"), 
-    # collect tournament type choice from the user
-    radioButtons("TournamentType", "Tournament Type:",
-                 c("ATP"="ATP",
-                   "WTA"="WTA")),
-    # collect surface type choice from the user
-    checkboxGroupInput("SurfaceType", "Surface Type:",
-                       c("Hard"="Hard",
-                         "Clay"="Clay",
-                         "Grass"="Grass",
-                         "Carpet"="Carpet")),
-    # collect year range from the user
-    # start year
-    numericInput("startYear", "Start Year:", 1968, min=1968, max=2021),
-    # end year
-    numericInput("endYear", "End Year:", 2021, min=1968, max=2021),
     
-    plotlyOutput("Figure1")
+    sidebarPanel(
+        #-------------------------
+        # Figure 1 in the article
+        #-------------------------
+        # collect tournament type choice from the user
+        radioButtons("TournamentType", "Tournament Type:",
+                     c("ATP"="ATP",
+                       "WTA"="WTA")),
+        # collect surface type choice from the user
+        checkboxGroupInput("SurfaceType", "Surface Type:",
+                           c("Hard"="Hard",
+                             "Clay"="Clay",
+                             "Grass"="Grass",
+                             "Carpet"="Carpet")),
+        # collect year range from the user
+        # start year
+        sliderInput("startYear", "Start Year:", min=1968, max=2021, value=1980),
+        # end year
+        sliderInput("endYear", "End Year:", min=1968, max=2021, value=1989),
+        
+        #-------------------------
+        # Prestige score
+        #-------------------------
+        # itera_fun(adjacencyMatrix(df))
+    ),
+    
+    mainPanel(
+        # Figure 1 
+        plotlyOutput("Figure1"),
+        # Prestige score
+        tableOutput("best10")
+    )
 )
 
 
 server <- function(input, output) {
     
+    df_filtered <- reactive({
+        # Creates a list of the studies checked and then filters the data 
+        # based on this information
+        return(yeardf(input$startYear, input$endYear,
+                      type = input$TournamentType, sur = input$SurfaceType))
+    }) 
+
     output$Figure1<- renderPlotly({
-        figure1(yeardf(input$startYear, input$endYear,
-                       type = input$TournamentType, sur = input$SurfaceType))
+        figure1(df_filtered())
     })
+
+
+    output$best10<- renderTable({
+        adjM <- adjacencyMatrix(df_filtered())
+        prestige<- itera_fun(adjM)$preScore
+        tbl<- prestige %>% arrange(desc(preScore)) %>% head(5) %>% select(players.name) 
+        return(tbl)
+    })
+    
 }
 
 shinyApp(ui = ui, server = server)
