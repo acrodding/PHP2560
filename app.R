@@ -53,15 +53,14 @@ figure1 <- function(df){
         summarise(n_tournaments = n_distinct(tourney_id),n_players = n_distinct(c(winner_name,loser_name)))
     numbers$year<-as.character(numbers$year)
     
-    players<- ggplot(dat=numbers) +
-        geom_col(aes(x=year, y=n_players))
-    tournaments<- ggplot(dat=numbers) +
-        geom_col(aes(x=year, y=n_tournaments))
+    players<- ggplotly(ggplot(dat=numbers) +
+        geom_col(aes(x=year, y=n_players)))
     
-    cowplot::plot_grid(players, 
-                       tournaments, 
-                       ncol = 1,
-                       labels = "auto")
+    tournaments<- ggplotly(ggplot(dat=numbers) +
+        geom_col(aes(x=year, y=n_tournaments)))
+    
+    subplot(players, tournaments, nrows=2)
+    
 }
 
 
@@ -83,13 +82,13 @@ ui <- fluidPage(
     # end year
     numericInput("endYear", "End Year:", 2021, min=1968, max=2021),
     
-    plotOutput("Figure1")
+    plotlyOutput("Figure1")
 )
 
 
 server <- function(input, output) {
     
-    output$Figure1<- renderPlot({
+    output$Figure1<- renderPlotly({
         figure1(yeardf(input$startYear, input$endYear,
                        type = input$TournamentType, sur = input$SurfaceType))
     })
