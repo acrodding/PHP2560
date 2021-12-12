@@ -1,8 +1,7 @@
 library(tidyverse)
 library(igraph) # for graph_from_data_frame and get.adjacency
 library(Gmisc) # for pathJoin function
-#library(gganimate)
-#library(gapminder)
+library(plotly)
 
 source("C:/Users/Anthony_Laptop/Documents/Brown University/PHP2560/Final/code/readdata.R", echo = TRUE)
 
@@ -83,7 +82,13 @@ create_plot_data <- function(years, type = "ATP", sur = "all"){
     df_l <- yeardf(min(years),year_end,type = "ATP",sur = "all")
     adjM_l <- adjacencyMatrix(df_l)
     pre_l <- itera_fun(adjM_l)
+    # Add year and rank cols
     pre_l[[1]]$year = year_end
+    pre_l[[1]] = pre_l[[1]] %>% 
+          arrange(desc(preScore)) %>%
+          mutate(rank = 1:nrow(pre_l[[1]]))
+    
+    #pre_l[[1]]$rank <-  rank(pre_l[[1]]$preScore)
     return(pre_l$preScore)
   }
   
@@ -98,3 +103,24 @@ y = c(1968, 1970, 1972)
 #y = seq(1968,2021,5) - this one will crash your computer lol
 
 test = create_plot_data(y)
+players = c("Arthur Ashe", "Rod Laver", "Roy Emerson", "Tom Okker", "Stan Smith")
+
+
+fig <- test %>% 
+  filter(players.name %in% players) %>%
+  plot_ly(
+    x = ~preScore, 
+    y = ~rank, 
+    frame = ~year, 
+    text = ~players.name, 
+    hoverinfo = "text",
+    type = 'scatter',
+    mode = 'markers'
+  )
+fig <- fig %>% layout(
+  yaxis = list(
+    range = c(10,1)
+  )
+)
+
+fig
