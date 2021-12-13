@@ -64,6 +64,8 @@ itera_fun <- function(M, d = 0.85, iter = 100){
 #  win_names[name] = sum(adjM[name,])/(sum(adjM[,name]) + sum(adjM[name,]))
 #}
 
+
+
 #hist(win_names, breaks = 50)
 #hist(win_names[win_names > 0], breaks = 50)
 
@@ -76,13 +78,21 @@ create_plot_data <- function(years, type = "ATP", sur = "all"){
   # Ex) years = (1968, 1970, 1972)
   # gets bind(p(1968,1968),p(1968,1970),p(1968,1972))
   
+  get_win_pct <- function(name, mat){
+    # gets win percentage of player in given year
+    return(sum(mat[name,])/(sum(mat[,name]) + sum(mat[name,])))
+  }
+  
   get_rows <- function(year_end, type = type, sur = sur){
     # Gets one new iteration between 2 years (min year and year_end)
     # p (min(years), year_end)
     df_l <- yeardf(min(years),year_end,type = "ATP",sur = "all")
     adjM_l <- adjacencyMatrix(df_l)
     pre_l <- itera_fun(adjM_l)
-    # Add year and rank cols
+    
+    win_pcts = sapply(X = rownames(adjM_l), get_win_pct, mat = adjM_l)
+    # Add year, win_pct and rank cols
+    pre_l[[1]]$win_pct = win_pcts
     pre_l[[1]]$year = year_end
     pre_l[[1]] = pre_l[[1]] %>% 
           arrange(desc(preScore)) %>%
@@ -103,13 +113,13 @@ y = c(1968, 1970, 1972)
 #y = seq(1968,2021,5) - this one will crash your computer lol
 
 test = create_plot_data(y)
-players = c("Arthur Ashe", "Rod Laver", "Roy Emerson", "Tom Okker", "Stan Smith")
+players = c("Arthur Ashe", "Rod Laver", "Roy Emerson", "Tom Okker", "Stan Smith", "Pancho Guzman", "Tom Edlefsen")
 
 
 fig <- test %>% 
   filter(players.name %in% players) %>%
   plot_ly(
-    x = ~preScore, 
+    x = ~win_pct, 
     y = ~rank, 
     frame = ~year, 
     text = ~players.name, 
@@ -119,8 +129,9 @@ fig <- test %>%
   )
 fig <- fig %>% layout(
   yaxis = list(
-    range = c(10,1)
+    range = c(200,0)
   )
 )
 
 fig
+
