@@ -4,6 +4,9 @@ library(Gmisc)
 library(plotly)
 library(ggpubr)
 library(igraph)
+library(knitr)
+library(tableone) # for prettier tables to display
+library(kableExtra)
 
 yeardf <-function(year.st,year.end, type = "ATP",sur = "all"){
     # given year range, and tournaments type in c("ATP","WTA"), and surface type
@@ -13,9 +16,12 @@ yeardf <-function(year.st,year.end, type = "ATP",sur = "all"){
     
     ATP_WTA <- function(type,sur){
         
-        path <- pathJoin("/Users/tianyecui/Desktop/2560/final/data", type)
-        setwd(path)
-        files <- list.files()  #load the file names into the workspace
+        # path <- pathJoin("./Data", type)
+        # setwd(path)
+        # files <- list.files()  #load the file names into the workspace
+        
+        if(type=="ATP") {files<- paste("data/",tolower(type),"_matches_",1968:2021,".csv", sep="")}
+        else {files<- paste("data/",tolower(type),"_matches_",1927:2021,".csv", sep="")}
         #initialize n_players and n_tournaments
         n_players<- vector()
         n_tournaments<- vector()
@@ -28,7 +34,7 @@ yeardf <-function(year.st,year.end, type = "ATP",sur = "all"){
         }
         
         for(j in 2:length(files)){
-            df <-read.csv(files[j])
+            df <- read.csv(files[j])
             if("all" %in% sur){
                 df.temp <- df  %>% select(tourney_id,tourney_name,winner_name,winner_id,loser_name,loser_id)
             }else{
@@ -134,7 +140,8 @@ ui <- fluidPage(
                            c("Hard"="Hard",
                              "Clay"="Clay",
                              "Grass"="Grass",
-                             "Carpet"="Carpet")),
+                             "Carpet"="Carpet"),
+                           selected="Hard"),
         # collect year range from the user
         # start year
         sliderInput("startYear", "Start Year:", min=1968, max=2021, value=1980),
@@ -170,12 +177,12 @@ server <- function(input, output) {
     })
 
 
-    output$best10<- renderTable({
+    output$best10<- function(){
         adjM <- adjacencyMatrix(df_filtered())
         prestige<- itera_fun(adjM)$preScore
-        tbl<- prestige %>% arrange(desc(preScore)) %>% head(5) %>% select(players.name) 
-        return(tbl)
-    })
+        data.frame(prestige %>% arrange(desc(preScore)) %>% head(5) %>% select(players.name)) %>%
+            knitr::kable("html", caption="Top 5 Players", col.names="") 
+    }
     
 }
 
