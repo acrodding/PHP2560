@@ -5,7 +5,6 @@ library(plotly)
 
 source("C:/Users/Anthony_Laptop/Documents/Brown University/PHP2560/Final/code/readdata.R", echo = TRUE)
 
-#df <- yeardf(1968,1968,type = "ATP",sur = "all")
 
 adjacencyMatrix<-function(df){
   # given dataframe of tennis, return adjacencyMatrix
@@ -27,10 +26,6 @@ adjacencyMatrix<-function(df){
   # return transposed , then row is i, col is j
   return(t(adjM))
 }
-
-# where row names are winner names: sum of row is win record, sum of col is loss record
-#adjM <- adjacencyMatrix(df)
-
 
 itera_fun <- function(M, d = 0.85, iter = 100){
   # M is adjacencymatrix, d is (1-q) is paper, iter is iteration times
@@ -55,20 +50,6 @@ itera_fun <- function(M, d = 0.85, iter = 100){
   pre <- data.frame("preScore" = pr[,iter], "players.name" = rownames(M))
   results <- list("preScore" =pre, "pre.matrix" = pr,"iteration.times" = iter)
 }
-
-#pre <- itera_fun(adjM)
-
-
-#win_names = numeric(length = dim(adjM)[1])
-#for(name in rownames(adjM)){
-#  win_names[name] = sum(adjM[name,])/(sum(adjM[,name]) + sum(adjM[name,]))
-#}
-
-
-
-#hist(win_names, breaks = 50)
-#hist(win_names[win_names > 0], breaks = 50)
-
 
 create_plot_data <- function(years, type = "ATP", sur = "all"){
   # creates data.frame(cols = preScore, name, year)
@@ -104,34 +85,52 @@ create_plot_data <- function(years, type = "ATP", sur = "all"){
   
   # bind(p(1968,1968),p(1968,1970),p(1968,1972))
   # using helper function
-  d = do.call(rbind, lapply(X = years, FUN = get_rows))
-  return(d)
+  plot_data = do.call(rbind, lapply(X = years, FUN = get_rows))
+  return(plot_data)
 }
 
-y = c(1968, 1970, 1972)
-#y = c(1970, 1980, 1990, 2000, 2010, 2020) - takes longer
-#y = seq(1968,2021,5) - this one will crash your computer lol
-
-test = create_plot_data(y)
-players = c("Arthur Ashe", "Rod Laver", "Roy Emerson", "Tom Okker", "Stan Smith", "Pancho Guzman", "Tom Edlefsen")
-
-
-fig <- test %>% 
-  filter(players.name %in% players) %>%
-  plot_ly(
-    x = ~win_pct, 
-    y = ~rank, 
-    frame = ~year, 
-    text = ~players.name, 
-    hoverinfo = "text",
-    type = 'scatter',
-    mode = 'markers'
+create_plot <- function(plot_data, players){
+  
+  plotted_players = plot_data %>% filter(players.name %in% players)
+  
+  fig <- plotted_players %>%
+    plot_ly(
+      x = ~year, 
+      y = ~rank, 
+      frame = ~year, 
+      text = ~players.name, 
+      hoverinfo = "text",
+      type = 'scatter',
+      mode = 'markers'
+    )
+  
+  
+  
+  fig <- fig %>% layout(
+    yaxis = list(
+      range = c(max(plotted_players$rank) + 10,1)
+    )
   )
-fig <- fig %>% layout(
-  yaxis = list(
-    range = c(200,0)
-  )
-)
+  
+    return(fig)
+}
 
-fig
+# 5 year range:
+#   all years
+# 6-16 year range:
+#   by 2, but include last year
+# 17-24 range:
+#   by 3, but include last year
+# 25- 32
+#    by 4
+# 33+
+# by 5
+
+#y = c(1968, 1970, 1972, 1974, 1976, 1978, 1980)  #not super fast but works
+#y = seq(1968, 1984, by = 2) # worked but took like half a minute
+#y = seq(1968, 2000, by = 4) # took 40 seconds
+y = seq(1968, 2021, by = 5)
+plot_data = create_plot_data(y)
+animation = create_plot(plot_data, c("Arthur Ashe", "Rod Laver", "Tom Gorman"))
+animation
 
