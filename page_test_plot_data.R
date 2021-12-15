@@ -2,6 +2,8 @@ library(tidyverse)
 library(igraph) # for graph_from_data_frame and get.adjacency
 library(Gmisc) # for pathJoin function
 library(plotly)
+library(ggraph)
+library(tidygraph)
 
 source("C:/Users/Anthony_Laptop/Documents/Brown University/PHP2560/Final/code/readdata.R", echo = TRUE)
 
@@ -51,7 +53,7 @@ itera_fun <- function(M, d = 0.85, iter = 100){
   results <- list("preScore" =pre, "pre.matrix" = pr,"iteration.times" = iter)
 }
 
-create_plot_data <- function(yrs, type = "ATP", sur = "all"){
+create_plot_data <- function(yrs, type2 = "ATP", sur = "all"){
   # creates data.frame(cols = preScore, name, year)
   # where each row represents a players preScore in a given year
   # calculates prestige scores between years min(years)
@@ -74,17 +76,15 @@ create_plot_data <- function(yrs, type = "ATP", sur = "all"){
     years = append(years, max(yrs))
   }
   
-  
-  
   get_win_pct <- function(name, mat){
     # gets win percentage of player in given year
     return(sum(mat[name,])/(sum(mat[,name]) + sum(mat[name,])))
   }
   
-  get_rows <- function(year_end, type = type, sur = sur){
+  get_rows <- function(year_end, type3 = type2, sur = sur){
     # Gets one new iteration between 2 years (min year and year_end)
     # p (min(years), year_end)
-    df_l <- yeardf(min(years),year_end,type = "ATP",sur = "all")
+    df_l <- yeardf(min(years),year_end,type = type3,sur = "all")
     adjM_l <- adjacencyMatrix(df_l)
     pre_l <- itera_fun(adjM_l)
     
@@ -95,7 +95,8 @@ create_plot_data <- function(yrs, type = "ATP", sur = "all"){
     pre_l[[1]] = pre_l[[1]] %>% 
           arrange(desc(preScore)) %>%
           mutate(rank = 1:nrow(pre_l[[1]]))
-    
+    print(str(pre_l))
+      
     return(pre_l$preScore)
   }
   
@@ -136,8 +137,61 @@ create_plot <- function(plot_data, players){
     return(fig)
 }
 
-y = seq(1980, 1989)
-plot_data = create_plot_data(y)
-animation = create_plot(plot_data, c("Arthur Ashe", "Rod Laver", "Tom Gorman", "John McEnroe"))
+y = seq(1980, 1982)
+plot_data = create_plot_data(y, type2 = "WTA")
+#animation = create_plot(plot_data, c("Arthur Ashe", "Rod Laver", "Tom Gorman", "John McEnroe"))
+animation = create_plot(plot_data, c("Martina Navratilova", "Chris Evert"))
 animation
+
+create_net <- function(df){
+  
+  create_nodes <- function(df){
+    # Hardcoding name columns. Can be put in arguments to generalize
+    players = unique(c(df$winner_name, df$loser_name))
+    return(players)
+  }
+  
+  # Node for each player
+  nodes = create_nodes(df)
+  
+  
+  matchups = df %>% select(c(loser_name, winner_name))
+  edges = sapply(X = matchups, FUN = match, table = nodes)
+  colnames(edges) = c("from", "to")
+  
+  return(list(nodes = as.data.frame(nodes), edges = as.data.frame(edges)))
+}
+
+df_l = yeardf(2005,2015,type = "ATP",sur = "all")
+network = create_net(df_l)
+network$edges = network$edges %>% group_by(from, to) %>% summarize(weight = n())
+routes_tidy <- tbl_graph(nodes = network$nodes, edges = network$edges, directed = TRUE)
+
+# ggraph(routes_tidy %>% filter(nodes %in% c("Roger Federer", "Rafael Nadal", "Novak Djokovic")), layout = "kk") +
+#   geom_node_point() +
+#   geom_edge_link(arrow = arrow(length = unit(5, 'mm')), aes(width = weight), alpha = 0.8) +
+#   scale_edge_width(range = c(0.2, 2)) +
+#   geom_node_text(aes(label = nodes), repel = TRUE) +
+#   # labs(edge_width = "Letters") +
+#   theme_graph()
+
+# ggraph(routes_tidy %>% filter(nodes %in% c("Roger Federer", "Rafael Nadal", "Novak Djokovic")), layout = "kk") +
+#   geom_node_point() +
+#   #geom_edge_link(arrow = arrow(length = unit(5, 'mm')), aes(alpha = weight)) +
+#   geom_edge_arc(arrow = arrow(length = unit(5, 'mm')), aes(alpha = weight))+
+#   scale_edge_width(range = c(0.2, 2)) +
+#   geom_node_text(aes(label = nodes), repel = TRUE) +
+#   # labs(edge_width = "Letters") +
+#   theme_graph()
+
+ggraph(routes_tidy %>% filter(nodes %in% c("Roger Federer", "Rafael Nadal", "Novak Djokovic")), layout = "kk") +
+  geom_node_point() +
+  geom_edge_arc(arrow = arrow(length = unit(5, 'mm')), aes(alpha = weight))+
+  scale_edge_alpha(range = c(0.1, 1), values = weight) +
+  geom_node_text(aes(label = nodes), repel = TRUE) +
+  # labs(edge_width = "Letters") +
+  theme_graph()
+
+# routes_tidy_sub <- routes_tidy %>% activate(nodes) %>% filter(nodes %in% c("Roger Federer", "Rafael Nadal", "Novak Djokovic")) 
+# plot(routes_tidy_sub)
 
