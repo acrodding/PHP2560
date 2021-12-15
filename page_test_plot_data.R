@@ -51,13 +51,30 @@ itera_fun <- function(M, d = 0.85, iter = 100){
   results <- list("preScore" =pre, "pre.matrix" = pr,"iteration.times" = iter)
 }
 
-create_plot_data <- function(years, type = "ATP", sur = "all"){
+create_plot_data <- function(yrs, type = "ATP", sur = "all"){
   # creates data.frame(cols = preScore, name, year)
   # where each row represents a players preScore in a given year
   # calculates prestige scores between years min(years)
   # and each other year in years input
   # Ex) years = (1968, 1970, 1972)
   # gets bind(p(1968,1968),p(1968,1970),p(1968,1972))
+  
+  # Appropriate spacing between years
+  range = length(yrs)
+  by = case_when(range < 6 ~ 1,
+                 range < 17 ~ 2,
+                 range < 25 ~ 3,
+                 range < 33 ~ 4,
+                 range > 33 ~ 5)
+
+  years = seq(min(yrs), max(yrs), by = by)
+  
+  # Check to include last year of inputted year 
+  if (tail(years, n=1) != max(yrs)){
+    years = append(years, max(yrs))
+  }
+  
+  
   
   get_win_pct <- function(name, mat){
     # gets win percentage of player in given year
@@ -79,11 +96,9 @@ create_plot_data <- function(years, type = "ATP", sur = "all"){
           arrange(desc(preScore)) %>%
           mutate(rank = 1:nrow(pre_l[[1]]))
     
-    #pre_l[[1]]$rank <-  rank(pre_l[[1]]$preScore)
     return(pre_l$preScore)
   }
   
-  # bind(p(1968,1968),p(1968,1970),p(1968,1972))
   # using helper function
   plot_data = do.call(rbind, lapply(X = years, FUN = get_rows))
   return(plot_data)
@@ -91,46 +106,38 @@ create_plot_data <- function(years, type = "ATP", sur = "all"){
 
 create_plot <- function(plot_data, players){
   
-  plotted_players = plot_data %>% filter(players.name %in% players)
+  plotted_players = plot_data %>% 
+        filter(players.name %in% players) %>%
+        mutate(text = paste0(players.name," (Rank: ", as.character(rank), ")"))
   
   fig <- plotted_players %>%
     plot_ly(
       x = ~year, 
       y = ~rank, 
       frame = ~year, 
-      text = ~players.name, 
+      text = ~text, 
       hoverinfo = "text",
       type = 'scatter',
-      mode = 'markers'
+      mode = 'markers',
+      showlegend = F
     )
   
-  
+  low_rank = max(plotted_players$rank)
   
   fig <- fig %>% layout(
     yaxis = list(
-      range = c(max(plotted_players$rank) + 10,1)
-    )
+      range = c(round(low_rank + 10, -1) + 10,1),
+      tickvals = c(round(low_rank + 10, -1), round(low_rank + 10, -1)/2, 1),
+      title = "Player Rank"
+    ),
+    xaxis = list(title = "Year")
   )
   
     return(fig)
 }
 
-# 5 year range:
-#   all years
-# 6-16 year range:
-#   by 2, but include last year
-# 17-24 range:
-#   by 3, but include last year
-# 25- 32
-#    by 4
-# 33+
-# by 5
-
-#y = c(1968, 1970, 1972, 1974, 1976, 1978, 1980)  #not super fast but works
-#y = seq(1968, 1984, by = 2) # worked but took like half a minute
-#y = seq(1968, 2000, by = 4) # took 40 seconds
-y = seq(1968, 2021, by = 5)
+y = seq(1980, 1989)
 plot_data = create_plot_data(y)
-animation = create_plot(plot_data, c("Arthur Ashe", "Rod Laver", "Tom Gorman"))
+animation = create_plot(plot_data, c("Arthur Ashe", "Rod Laver", "Tom Gorman", "John McEnroe"))
 animation
 
