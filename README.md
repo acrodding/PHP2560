@@ -5,7 +5,7 @@ https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0017249
 Data source: https://github.com/JeffSackmann/tennis_atp
 
 Description in Shiny App:
-This app explores using a network graph to rank tennis players in a given range of years. The metric generated from the network, Prestige Score, assigns a value to each player similar to how the PageRank assigns rank to web pages. The value is reflective of each player's match record, but importantly, also considers the quality of opponent for each match. Being time independent, this approach allows for analysis between players who never played each other. 
+This app explores using a network graph to rank tennis players in a given range of years. The metric generated from the network, Prestige Score, assigns a value to each player similar to how the PageRank algorithm assigns rank to web pages. The value is reflective of each player's match record, but importantly, also considers the quality of opponent for each match. Being time independent, this approach allows for analysis between players who never played each other. 
 
 The user may specify year range, court surface, and the choice of players in either the WTA or ATP
 
